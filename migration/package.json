@@ -1,0 +1,15 @@
+{
+  "name": "expense-migration-tools",
+  "version": "1.0.0",
+  "description": "Data migration tools for ExpenseTracker SwiftUI app",
+  "main": "export_expenses_for_swift.js",
+  "scripts": {
+    "export": "node export_expenses_for_swift.js"
+  },
+  "keywords": ["expense", "migration", "sqlite"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "sqlite3": "^5.1.6"
+  }
+}
