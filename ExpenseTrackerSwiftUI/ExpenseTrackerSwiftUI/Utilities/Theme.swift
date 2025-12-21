@@ -44,7 +44,7 @@ struct Theme {
         glassBackground: Color.white.opacity(0.3),
         categorySelected: Color(red: 229/255, green: 229/255, blue: 234/255),
         categoryIconColor: Color(red: 142/255, green: 142/255, blue: 147/255),
-        appleBlue: Color(red: 0/255, green: 122/255, blue: 255/255),
+        appleBlue: Color(red: 0/255, green: 149/255, blue: 255/255),
         systemRed: Color(red: 255/255, green: 69/255, blue: 58/255),
         systemOrange: Color(red: 255/255, green: 159/255, blue: 10/255),
         systemYellow: Color(red: 255/255, green: 214/255, blue: 10/255),
@@ -63,7 +63,7 @@ struct Theme {
     )
 
     static let dark = Theme(
-        background: .black,
+        background: Color(red: 0, green: 0, blue: 0),
         itemCardBackground: Color.white.opacity(0.11),
         text: .white,
         textInvert: .black,
@@ -73,7 +73,7 @@ struct Theme {
         glassBackground: Color.white.opacity(0.1),
         categorySelected: Color.white.opacity(0.2),
         categoryIconColor: Color(red: 142/255, green: 142/255, blue: 147/255),
-        appleBlue: Color(red: 10/255, green: 132/255, blue: 255/255),
+        appleBlue: Color(red: 0/255, green: 149/255, blue: 255/255),
         systemRed: Color(red: 255/255, green: 69/255, blue: 58/255),
         systemOrange: Color(red: 255/255, green: 159/255, blue: 10/255),
         systemYellow: Color(red: 255/255, green: 214/255, blue: 10/255),
