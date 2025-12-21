@@ -259,64 +259,6 @@ final class DatabaseManager {
         print("✅ All expenses deleted")
     }
     
-    // MARK: - Sample Data
-    
-    /// Seed placeholder expenses if database is empty
-    func seedPlaceholderExpensesIfNeeded() throws {
-        guard let context = modelContext else {
-            throw DatabaseError.notInitialized
-        }
-        
-        // Check if database already has expenses
-        let descriptor = FetchDescriptor<Expense>()
-        let existingCount = try context.fetchCount(descriptor)
-        
-        if existingCount > 0 {
-            print("📊 Database already has \(existingCount) expenses, skipping seed")
-            return
-        }
-        
-        // Create sample expenses with varied dates
-        let calendar = Calendar.current
-        let now = Date()
-        
-        let placeholderExpenses: [(amount: Double, category: String, description: String, daysAgo: Int)] = [
-            (45.99, "groceries", "Weekly grocery shopping", 0),
-            (12.50, "food", "Lunch at cafe", 0),
-            (29.99, "amazon", "USB-C cable", 1),
-            (8.75, "transportation", "Subway fare", 1),
-            (15.00, "food", "Coffee and pastries", 2),
-            (89.50, "fashion", "New shirt", 3),
-            (120.00, "monthly", "Gym membership", 4),
-            (35.25, "groceries", "Organic produce", 5),
-            (22.00, "food", "Dinner with friends", 5),
-            (199.99, "furniture", "Desk lamp", 6),
-            (5.50, "transportation", "Bus ticket", 7),
-            (18.75, "food", "Breakfast", 7),
-            (67.00, "personal", "Video game", 8),
-            (45.00, "groceries", "Household items", 9),
-            (150.00, "travel", "Hotel booking", 10),
-            (9.99, "amazon", "Phone case", 11),
-            (13.25, "food", "Fast food", 12),
-            (55.00, "fashion", "Sneakers", 13),
-            (25.50, "transportation", "Taxi ride", 14),
-            (32.00, "food", "Restaurant dinner", 15)
-        ]
-        
-        for expenseData in placeholderExpenses {
-            let date = calendar.date(byAdding: .day, value: -expenseData.daysAgo, to: now) ?? now
-            let expense = Expense(
-                amount: expenseData.amount,
-                category: expenseData.category,
-                description: expenseData.description,
-                timestamp: date
-            )
-            context.insert(expense)
-        }
-        
-        try context.save()
-        print("✅ Seeded \(placeholderExpenses.count) placeholder expenses")
-    }
 }
 
 // MARK: - Error Types

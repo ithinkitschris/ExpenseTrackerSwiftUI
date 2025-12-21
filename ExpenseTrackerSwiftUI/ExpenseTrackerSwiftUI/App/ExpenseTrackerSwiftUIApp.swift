@@ -12,14 +12,6 @@ struct ExpenseTrackerSwiftUIApp: App {
             modelContainer = try ModelContainer(for: Expense.self)
             // Initialize DatabaseManager with model context
             DatabaseManager.shared.setModelContext(modelContainer.mainContext)
-            
-            // Seed placeholder expenses if database is empty
-            do {
-                try DatabaseManager.shared.seedPlaceholderExpensesIfNeeded()
-            } catch {
-                print("⚠️ Failed to seed placeholder expenses: \(error)")
-                // Don't crash the app if seeding fails
-            }
         } catch {
             fatalError("Failed to initialize ModelContainer: \(error)")
         }

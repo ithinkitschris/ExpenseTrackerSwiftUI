@@ -6,14 +6,14 @@ enum Constants {
 
     static let expenseCategories = [
         "amazon",
-        "transportation",
-        "groceries",
-        "personal",
         "fashion",
-        "travel",
         "food",
+        "furniture",
+        "groceries",
         "monthly",
-        "furniture"
+        "personal",
+        "transportation",
+        "travel"
     ]
 
     // MARK: - Category Icons (SF Symbols)

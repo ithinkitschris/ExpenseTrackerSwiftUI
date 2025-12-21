@@ -13,6 +13,7 @@ struct ExpenseRow: View {
             // Main content
             ZStack(alignment: .bottomTrailing) {
                 VStack(alignment: .leading, spacing: 8) {
+                    
                     // Category icon and name
                     HStack(spacing: 6) {
                         categoryIcon
@@ -24,18 +25,19 @@ struct ExpenseRow: View {
                     
                     // Expense information (title)
                     Text(expense.expenseDescription)
-                        .font(.system(size: 24))
+                        .font(.system(size: 26))
+                        .fontWeight(.medium)
                         .foregroundColor(.white)
-                        .lineLimit(2)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.trailing, 40) // Make space for menu button
+                .padding(.trailing, 50) // Make space for menu button
                 
                 // Expense amount in bottom right corner
                 Text(formatIntegerAmount(expense.amount))
-                    .font(.system(size: 24))
+                    .font(.system(size: 26))
                     .fontWeight(.regular)
-                    .foregroundColor(.white.opacity(0.8))
+                    .kerning(-0.5)
+                    .foregroundColor(.white.opacity(1))
             }
             .padding(.bottom, 22)
             .padding(.top, 18)
@@ -62,7 +64,7 @@ struct ExpenseRow: View {
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.4))
+                        .foregroundColor(.white.opacity(0.6))
                         .frame(width: 32, height: 32)
                 }
                 .padding(.vertical, 5)
@@ -73,13 +75,14 @@ struct ExpenseRow: View {
             LinearGradient(
                 gradient: Gradient(colors: [
                     theme.colorForCategory(expense.category),
-                    shiftHueAndDarken(theme.colorForCategory(expense.category), hueShift: 10, brightnessReduction: 0.2)
+                    shiftHueAndDarken(theme.colorForCategory(expense.category), hueShift: 12, brightnessReduction: 0.1)
                 ]),
-                startPoint: .leading,
-                endPoint: .trailing
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
             )
         )
-        .cornerRadius(25)
+        .cornerRadius(30)
+        .padding(.horizontal, 2)
     }
 
     // MARK: - Subviews
