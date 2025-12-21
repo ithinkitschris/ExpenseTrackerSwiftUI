@@ -773,7 +773,7 @@ struct AddExpenseSheet: View {
                                 .padding()
                                 .background(theme.itemCardBackground)
                                 .cornerRadius(30)
-                                .padding(.horizontal, 60)
+                                .padding(.horizontal, 30)
                                 .onChange(of: customAmount) { _, newValue in
                                     if let value = Int(newValue), value > 0 {
                                         amount = value
@@ -808,7 +808,7 @@ struct AddExpenseSheet: View {
 
                         Section("Category") {
                             ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
+                                HStack(spacing: 8) {
                                     ForEach(Constants.expenseCategories, id: \.self) { category in
                                         Button(action: {
                                             selectedCategory = category
@@ -817,30 +817,48 @@ struct AddExpenseSheet: View {
                                                 generator.impactOccurred()
                                             }
                                         }) {
-                                            HStack(spacing: 6) {
+                                            HStack(spacing: 8) {
                                                 Image(systemName: Constants.iconForCategory(category))
-                                                    .foregroundStyle(.white)
+                                                    .foregroundStyle(
+                                                        selectedCategory == category
+                                                            ? .white
+                                                            : theme.colorForCategory(category)
+                                                    )
                                                     .imageScale(.small)
+
                                                 Text(Constants.displayNameForCategory(category))
                                                     .font(.subheadline)
                                                     .fontWeight(.medium)
-                                                    .foregroundStyle(.white)
+                                                    .foregroundStyle(
+                                                        selectedCategory == category
+                                                            ? .white
+                                                            : (theme.text.opacity(0.6))
+                                                    )
                                             }
-                                            .padding(.horizontal, 16)
-                                            .padding(.vertical, 10)
+                                            .padding(.horizontal, 18)
+                                            .padding(.vertical, 12)
                                             .background(
                                                 selectedCategory == category
                                                     ? theme.colorForCategory(category)
-                                                    : theme.colorForCategory(category).opacity(0.3)
+                                                    : Color.gray.opacity(0.3)
                                             )
                                             .clipShape(Capsule())
+                                            .overlay(
+                                                Group {
+                                                    if selectedCategory == category {
+                                                        Capsule()
+                                                            .strokeBorder(theme.colorForCategory(category).opacity(0.6), lineWidth: 2)
+                                                    }
+                                                }
+                                            )
                                         }
                                         .buttonStyle(.plain)
                                     }
                                 }
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 4)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 0)
                             }
+                            .clipShape(Capsule())
                             .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                             .listRowBackground(Color.clear)
                         }
