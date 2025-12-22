@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Theme system matching the React Native app's Apple color palette
 struct Theme {
+    let isDark: Bool
     let background: Color
     let itemCardBackground: Color
     let text: Color
@@ -34,6 +35,7 @@ struct Theme {
     let shadowOpacity: Double
 
     static let light = Theme(
+        isDark: false,
         background: Color(red: 255/255, green: 255/255, blue: 255/255, opacity: 0.98),
         itemCardBackground: Color(red: 252/255, green: 252/255, blue: 252/255),
         text: .black,
@@ -63,6 +65,7 @@ struct Theme {
     )
 
     static let dark = Theme(
+        isDark: true,
         background: Color(red: 0, green: 0, blue: 0),
         itemCardBackground: Color.white.opacity(0.11),
         text: .white,

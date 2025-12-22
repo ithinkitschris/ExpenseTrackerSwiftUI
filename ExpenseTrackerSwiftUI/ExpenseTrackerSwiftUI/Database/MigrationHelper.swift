@@ -59,6 +59,49 @@ final class MigrationHelper {
         return try importFromJSON(jsonData)
     }
     
+    // MARK: - SQLite Export
+    
+    /// Export current SwiftData database to SQLite file
+    /// - Returns: URL to the exported database file in temporary directory
+    func exportToSQLite() throws -> URL {
+        // Get the SwiftData store location
+        let fileManager = FileManager.default
+        
+        // SwiftData stores the database in the app's Application Support directory
+        guard let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            throw MigrationError.exportFailed("Could not locate Application Support directory")
+        }
+        
+        // SwiftData typically stores the database as "default.store"
+        let storeURL = appSupportURL.appendingPathComponent("default.store")
+        
+        // Check if the database file exists
+        guard fileManager.fileExists(atPath: storeURL.path) else {
+            throw MigrationError.exportFailed("Database file not found at \(storeURL.path)")
+        }
+        
+        // Create a temporary directory for the export
+        let tempDirectory = fileManager.temporaryDirectory
+        
+        // Create a user-friendly filename with timestamp
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let dateString = dateFormatter.string(from: Date())
+        let exportFileName = "ExpenseTracker_\(dateString).db"
+        let exportURL = tempDirectory.appendingPathComponent(exportFileName)
+        
+        // Remove existing file if it exists
+        if fileManager.fileExists(atPath: exportURL.path) {
+            try fileManager.removeItem(at: exportURL)
+        }
+        
+        // Copy the database file to the temporary location
+        try fileManager.copyItem(at: storeURL, to: exportURL)
+        
+        print("✅ Database exported to: \(exportURL.path)")
+        return exportURL
+    }
+    
     // MARK: - SQLite Direct Import
     
     /// Import expenses directly from SQLite database file
@@ -222,6 +265,7 @@ enum MigrationError: Error, LocalizedError {
     case invalidJSON
     case fileNotFound
     case importFailed(String)
+    case exportFailed(String)
     case invalidDatabase
 
     var errorDescription: String? {
@@ -232,6 +276,8 @@ enum MigrationError: Error, LocalizedError {
             return "File not found"
         case .importFailed(let message):
             return "Import failed: \(message)"
+        case .exportFailed(let message):
+            return "Export failed: \(message)"
         case .invalidDatabase:
             return "Invalid database format"
         }

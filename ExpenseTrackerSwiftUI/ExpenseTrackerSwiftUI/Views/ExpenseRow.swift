@@ -9,38 +9,41 @@ struct ExpenseRow: View {
     var onDelete: (() -> Void)? = nil
 
     var body: some View {
+
         ZStack(alignment: .topTrailing) {
+
             // Main content
             ZStack(alignment: .bottomTrailing) {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 9) {
                     
                     // Category icon and name
                     HStack(spacing: 6) {
                         categoryIcon
                         
                         Text(Constants.displayNameForCategory(expense.category))
-                            .font(.caption)
+                            .font(.system(size: 11))
+                            .fontWeight(.medium)
                             .foregroundColor(.white.opacity(0.8))
                     }
                     
                     // Expense information (title)
                     Text(expense.expenseDescription)
-                        .font(.system(size: 26))
+                        .font(.system(size: 24))
                         .fontWeight(.medium)
                         .foregroundColor(.white)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.trailing, 50) // Make space for menu button
+                .padding(.trailing, 55) // Make space for menu button
                 
                 // Expense amount in bottom right corner
                 Text(formatIntegerAmount(expense.amount))
-                    .font(.system(size: 26))
+                    .font(.system(size: 28))
                     .fontWeight(.regular)
                     .kerning(-0.5)
                     .foregroundColor(.white.opacity(1))
             }
-            .padding(.bottom, 22)
-            .padding(.top, 18)
+            .padding(.bottom, 18)
+            .padding(.top, 12)
             .padding(.horizontal, 24)
             
             // Three-dot menu button in top right
@@ -67,10 +70,11 @@ struct ExpenseRow: View {
                         .foregroundColor(.white.opacity(0.6))
                         .frame(width: 32, height: 32)
                 }
-                .padding(.vertical, 5)
+                .padding(.vertical, 2)
                 .padding(.horizontal, 16)
             }
         }
+        
         .background(
             LinearGradient(
                 gradient: Gradient(colors: [
@@ -81,7 +85,7 @@ struct ExpenseRow: View {
                 endPoint: .bottomTrailing
             )
         )
-        .cornerRadius(30)
+        .cornerRadius(25)
         .padding(.horizontal, 2)
     }
 
