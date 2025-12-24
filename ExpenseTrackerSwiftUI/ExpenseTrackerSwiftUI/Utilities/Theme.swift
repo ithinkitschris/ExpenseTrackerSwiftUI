@@ -107,7 +107,7 @@ extension Theme {
         case "food": return systemRed
         case "furniture": return systemOrange
         case "groceries": return systemMint
-        case "monthly": return systemGray
+        case "subscriptions": return systemGray
         case "transportation": return systemIndigo
         case "travel": return systemCyan
         default: return appleBlue

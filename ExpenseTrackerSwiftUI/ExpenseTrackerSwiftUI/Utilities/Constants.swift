@@ -10,7 +10,7 @@ enum Constants {
         "food",
         "furniture",
         "groceries",
-        "monthly",
+        "subscriptions",
         "personal",
         "transportation",
         "travel"
@@ -27,7 +27,7 @@ enum Constants {
         case "fashion": return "tshirt.fill"
         case "travel": return "airplane"
         case "food": return "fork.knife"
-        case "monthly": return "calendar"
+        case "subscriptions": return "calendar"
         case "furniture": return "bed.double.fill"
         default: return "chart.bar.fill"
         }

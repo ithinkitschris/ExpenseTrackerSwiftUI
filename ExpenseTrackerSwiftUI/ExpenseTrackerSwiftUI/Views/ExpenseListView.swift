@@ -22,6 +22,10 @@ struct ExpenseListView: View {
     @State private var lastHapticOffset: CGFloat = 0
     @State private var expenseToDelete: Expense?
     @State private var showDeleteConfirmation = false
+    @State private var selectedExpense: Expense?
+    @State private var groupingMode: GroupingMode = .day
+    @State private var showGroupingSelector = false
+    @State private var dragOffset: CGFloat = 0
     
     // Filtered expenses based on category selection
     private var filteredExpenses: [Expense] {
@@ -29,6 +33,13 @@ struct ExpenseListView: View {
             return allExpenses.filter { $0.category == category }
         }
         return allExpenses
+    }
+    
+    // Grouping mode enum
+    enum GroupingMode: String, CaseIterable {
+        case day = "Day"
+        case week = "Week"
+        case month = "Month"
     }
 
     var body: some View {
@@ -80,20 +91,37 @@ struct ExpenseListView: View {
             }
             .ignoresSafeArea(.container, edges: .bottom)
             
-            // Bottom bar with add button
+            // Grouping selector - bottom center of screen
+            VStack {
+                Spacer()
+                if showGroupingSelector && selectedCategory == nil {
+                    groupingSelector
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.bottom, 29)
+            .ignoresSafeArea(.container, edges: .bottom)
+            .zIndex(1)
+            
+            // Add expense button - bottom right
             VStack {
                 Spacer()
                 HStack {
                     Spacer()
-                    
-                    // Add expense button - bottom right
                     addButton
+                        .scaleEffect(showGroupingSelector && selectedCategory == nil ? 0.76 : 1.0)
+                        .animation(.spring(response: 0.2, dampingFraction: 0.2), value: showGroupingSelector)
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 20)
             }
             .ignoresSafeArea(.container, edges: .bottom)
-            .zIndex(1)
+            .zIndex(2)
+        }
+        .sheet(item: $selectedExpense) { expense in
+            ExpenseDetailView(expense: expense)
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showingAddExpense) {
             AddExpenseSheet(currentDetent: $selectedDetent)
@@ -314,90 +342,199 @@ struct ExpenseListView: View {
             view.glassEffect(.regular.interactive().tint(color.opacity(0.6)), in: .capsule)
         }
     }
-
-    /// List of expenses grouped by day
-    /// - Returns: A list view of expenses grouped by day
-    private var expenseList: some View {
-        List {
-            // Top spacer for category bar
-            Color.clear
-                .frame(height: 80)
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-            
-            ForEach(Array(groupedExpenses.enumerated()), id: \.element.0) { index, group in
-                let (dayHeader, expenses) = group
-                
-                // Day header as a regular list item (not a section header)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(dayHeader)
-                        .font(.largeTitle)
-                        .fontWeight(.semibold)
-                        .foregroundColor(theme.text)
-                    
-                    Text(dayTotal(for: expenses))
-                        .font(.subheadline)
-                        .foregroundColor(theme.textTertiary)
+    
+    // MARK: - GROUPING SELECTOR COMPONENT
+    
+    /// Native iOS-style segmented control for day/week grouping
+    private var groupingSelector: some View {
+        HStack(spacing: 0) {
+            ForEach(GroupingMode.allCases, id: \.self) { mode in
+                Button {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.2)) {
+                        groupingMode = mode
+                    }
+                    if Constants.enableHapticFeedback {
+                        let generator = UIImpactFeedbackGenerator(style: .medium)
+                        generator.impactOccurred()
+                    }
+                } label: {
+                    Text(mode.rawValue)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(groupingMode == mode ? (isLightMode ? .black : .white) : (isLightMode ? .black.opacity(0.5) : .white.opacity(0.6)))
+                        .frame(width: 76, height: 39)
+                        .background(
+                            Group {
+                                if groupingMode == mode {
+                                    Capsule()
+                                        .fill(isLightMode ? .white : Color.white.opacity(0.2))
+                                }
+                            }
+                        )
                 }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .listRowInsets(EdgeInsets(top: index == 0 ? 20 : 60, leading: 10, bottom: 8, trailing: 10))
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-                
-                // Expenses for this day
-                ForEach(expenses) { expense in
-                    ExpenseRow(
-                        expense: expense,
-                        onEdit: {
-                            expenseToEdit = expense
-                            if Constants.enableHapticFeedback {
-                                let generator = UIImpactFeedbackGenerator(style: .light)
-                                generator.impactOccurred()
-                            }
-                        },
-                        onDelete: {
-                            expenseToDelete = expense
-                            showDeleteConfirmation = true
-                        }
-                    )
-                    .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10))
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) {
-                            expenseToDelete = expense
-                            showDeleteConfirmation = true
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                        .tint(.red)
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(6)
+        .glassEffect(.regular, in: .capsule)
+    }
 
-                        Button {
-                            expenseToEdit = expense
-                            if Constants.enableHapticFeedback {
-                                let generator = UIImpactFeedbackGenerator(style: .light)
-                                generator.impactOccurred()
-                            }
-                        } label: {
-                            Label("Edit", systemImage: "pencil")
+
+    /// List of expenses grouped by day or week
+    /// - Returns: A list view of expenses grouped by day or week
+    private var expenseList: some View {
+        ScrollViewReader { proxy in
+            List {
+                // Top spacer for category bar
+                Color.clear
+                    .frame(height: selectedCategory == nil ? 80 : 120)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .id("top")
+                
+                if selectedCategory == nil {
+                    // Show grouped view with day/week headers when viewing all expenses
+                    ForEach(Array(groupedExpenses.enumerated()), id: \.element.0) { index, group in
+                        let (header, expenses) = group
+                        
+                        // Day/Week header as a regular list item (not a section header)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(header)
+                                .font(.largeTitle)
+                                .fontWeight(.semibold)
+                                .foregroundColor(theme.text)
+                            
+                            Text(dayTotal(for: expenses))
+                                .font(.subheadline)
+                                .foregroundColor(theme.textTertiary)
                         }
-                        .tint(theme.appleBlue)
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .listRowInsets(EdgeInsets(top: index == 0 ? 20 : 60, leading: 10, bottom: 8, trailing: 10))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                        .id("header-\(index)")
+                        
+                        // Expenses for this day/week
+                        ForEach(expenses) { expense in
+                            ExpenseRow(
+                                expense: expense,
+                                onEdit: {
+                                    expenseToEdit = expense
+                                    if Constants.enableHapticFeedback {
+                                        let generator = UIImpactFeedbackGenerator(style: .light)
+                                        generator.impactOccurred()
+                                    }
+                                },
+                                onDelete: {
+                                    expenseToDelete = expense
+                                    showDeleteConfirmation = true
+                                },
+                                onTap: {
+                                    selectedExpense = expense
+                                }
+                            )
+                            .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    expenseToDelete = expense
+                                    showDeleteConfirmation = true
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                .tint(.red)
+
+                                Button {
+                                    expenseToEdit = expense
+                                    if Constants.enableHapticFeedback {
+                                        let generator = UIImpactFeedbackGenerator(style: .light)
+                                        generator.impactOccurred()
+                                    }
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                .tint(theme.appleBlue)
+                            }
+                        }
+                    }
+                } else {
+                    // Show flat list without day headers when viewing a specific category
+                    ForEach(filteredExpenses) { expense in
+                        ExpenseRow(
+                            expense: expense,
+                            showDate: true,
+                            onEdit: {
+                                expenseToEdit = expense
+                                if Constants.enableHapticFeedback {
+                                    let generator = UIImpactFeedbackGenerator(style: .light)
+                                    generator.impactOccurred()
+                                }
+                            },
+                            onDelete: {
+                                expenseToDelete = expense
+                                showDeleteConfirmation = true
+                            },
+                            onTap: {
+                                selectedExpense = expense
+                            }
+                        )
+                        .listRowInsets(EdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                expenseToDelete = expense
+                                showDeleteConfirmation = true
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                            .tint(.red)
+
+                            Button {
+                                expenseToEdit = expense
+                                if Constants.enableHapticFeedback {
+                                    let generator = UIImpactFeedbackGenerator(style: .light)
+                                    generator.impactOccurred()
+                                }
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+                            .tint(theme.appleBlue)
+                        }
                     }
                 }
+                
+                // Bottom spacer
+                Color.clear
+                    .frame(height: 80)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             }
-            
-            // Bottom spacer
-            Color.clear
-                .frame(height: 80)
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .scrollIndicators(.hidden)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        let delta = value.translation.height - dragOffset
+                        dragOffset = value.translation.height
+                        
+                        // Show selector when dragging down (scrolling content up)
+                        // Hide when dragging up (scrolling content down)
+                        if abs(delta) > 2 {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                showGroupingSelector = delta < 0 // Negative delta = dragging up = scrolling down
+                            }
+                        }
+                    }
+                    .onEnded { _ in
+                        dragOffset = 0
+                    }
+            )
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .scrollIndicators(.hidden)
     }
 
 //    private var totalSummaryCard: some View {
@@ -469,7 +606,7 @@ struct ExpenseListView: View {
         }
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive().tint(isLightMode ? .white.opacity(0.95) : .clear), in: .circle)
-        .simultaneousGesture(
+        .highPriorityGesture(
             LongPressGesture(minimumDuration: 0.5)
                 .onEnded { _ in
                     showingDatabaseDialog = true
@@ -500,16 +637,40 @@ struct ExpenseListView: View {
     }
     
     private var groupedExpenses: [(String, [Expense])] {
-        let grouped = Dictionary(grouping: filteredExpenses) { expense in
-            expense.dayHeader
-        }
-
-        return grouped.sorted { first, second in
-            guard let firstDate = first.value.first?.timestamp,
-                  let secondDate = second.value.first?.timestamp else {
-                return false
+        switch groupingMode {
+        case .day:
+            let grouped = Dictionary(grouping: filteredExpenses) { expense in
+                expense.dayHeader
             }
-            return firstDate > secondDate
+            return grouped.sorted { first, second in
+                guard let firstDate = first.value.first?.timestamp,
+                      let secondDate = second.value.first?.timestamp else {
+                    return false
+                }
+                return firstDate > secondDate
+            }
+        case .week:
+            let grouped = Dictionary(grouping: filteredExpenses) { expense in
+                expense.weekHeader
+            }
+            return grouped.sorted { first, second in
+                guard let firstDate = first.value.first?.weekStartDate,
+                      let secondDate = second.value.first?.weekStartDate else {
+                    return false
+                }
+                return firstDate > secondDate
+            }
+        case .month:
+            let grouped = Dictionary(grouping: filteredExpenses) { expense in
+                expense.monthHeader
+            }
+            return grouped.sorted { first, second in
+                guard let firstDate = first.value.first?.monthStartDate,
+                      let secondDate = second.value.first?.monthStartDate else {
+                    return false
+                }
+                return firstDate > secondDate
+            }
         }
     }
 
@@ -874,6 +1035,19 @@ struct AddExpenseSheet: View {
             currentDetent = .fraction(0.45)
             shouldDismissParent = false
         }
+        .onChange(of: currentDetent) { oldDetent, newDetent in
+            // Phase 1: Prevent swiping up to full screen
+            if currentStep == 1 && newDetent == .large {
+                // Snap back to small detent
+                DispatchQueue.main.async {
+                    currentDetent = .fraction(0.45)
+                }
+            }
+            // Phase 2: Dismiss modal when swiping down
+            else if currentStep == 2 && oldDetent == .large && newDetent == .fraction(0.45) {
+                dismiss()
+            }
+        }
         .sheet(isPresented: $showingAddMultiple) {
             AddMultipleExpensesSheet(shouldDismissParent: $shouldDismissParent)
                 .presentationDetents([.large])
@@ -906,7 +1080,7 @@ struct AddExpenseSheet: View {
                 ToolbarItem(placement: .principal) {
                     if currentStep == 1 {
                         Text("New Expense")
-                            .font(.system(size: 27, weight: .medium))
+                            .font(.system(size: 24, weight: .medium))
                             .foregroundColor(theme.text)
                             .padding(.top, 2)
                     }
@@ -921,9 +1095,16 @@ struct AddExpenseSheet: View {
                             }
                         } label: {
                             Image(systemName: "square.stack.3d.up.fill")
-                                .font(.system(size: 18))
-                                .foregroundStyle(theme.text)
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(.leading, 2)
+                                .padding(.trailing, 2)
+                                .padding(.top, 20)
+                                .padding(.bottom, 20)
                         }
+                        .buttonStyle(.borderedProminent)
+                        .clipShape(Circle())
+                        .tint(theme.isDark ? Color.white.opacity(0.05) : Color.black.opacity(0.08))
                         .zIndex(999)
                     } else {
                         Button("Back") {
@@ -944,29 +1125,35 @@ struct AddExpenseSheet: View {
     }
     
     private var phase1View: some View {
-        VStack(spacing: 15) {
-            Color.clear.frame(height: 0)
-
-            ZStack {
-                // Selection Highlight Background (Light Mode only to avoid overlap)
-                Capsule()
-                    .fill(theme.isDark ? Color.clear : Color.black.opacity(0.1))
-                    .frame(width: 300, height: 70)
-
-                CustomWheelPicker(
-                    selection: $amount,
-                    rowHeight: 68,
-                    font: .systemFont(ofSize: 58, weight: .regular),
-                    textColor: theme.text
-                )
-            }
-            .frame(height: 216)
+        ZStack {
+            // Dark gray background for phase 1
+            Color(red: 28/255, green: 28/255, blue: 30/255)
+                .ignoresSafeArea()
             
-            customAmountTextField
+            VStack(spacing: 15) {
+                Color.clear.frame(height: 0)
 
-            Spacer()
+                ZStack {
+                    // Selection Highlight Background (Light Mode only to avoid overlap)
+                    Capsule()
+                        .fill(theme.isDark ? Color.clear : Color.black.opacity(0.1))
+                        .frame(width: 300, height: 70)
+
+                    CustomWheelPicker(
+                        selection: $amount,
+                        rowHeight: 68,
+                        font: .systemFont(ofSize: 58, weight: .regular),
+                        textColor: theme.text
+                    )
+                }
+                .frame(height: 216)
+                
+                customAmountTextField
+
+                Spacer()
+            }
+            .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
         .onTapGesture {
             isCustomAmountFocused = false
@@ -1425,6 +1612,187 @@ struct EditExpenseSheet: View {
             category: "food",
             description: "Lunch at chipotle",
             timestamp: Date().addingTimeInterval(-172800) // 2 days ago
+        ),
+        // Additional 30 samples
+        Expense(
+            amount: 125.00,
+            category: "health",
+            description: "Doctor's appointment",
+            timestamp: Date().addingTimeInterval(-259200) // 3 days ago
+        ),
+        Expense(
+            amount: 78.50,
+            category: "groceries",
+            description: "Trader Joe's weekly shopping",
+            timestamp: Date().addingTimeInterval(-259200)
+        ),
+        Expense(
+            amount: 15.99,
+            category: "food",
+            description: "Breakfast at local cafe",
+            timestamp: Date().addingTimeInterval(-345600) // 4 days ago
+        ),
+        Expense(
+            amount: 199.99,
+            category: "fashion",
+            description: "Zara clothing haul",
+            timestamp: Date().addingTimeInterval(-345600)
+        ),
+        Expense(
+            amount: 42.00,
+            category: "transportation",
+            description: "Uber rides",
+            timestamp: Date().addingTimeInterval(-432000) // 5 days ago
+        ),
+        Expense(
+            amount: 89.00,
+            category: "utilities",
+            description: "Internet bill",
+            timestamp: Date().addingTimeInterval(-432000)
+        ),
+        Expense(
+            amount: 28.75,
+            category: "food",
+            description: "Pizza delivery",
+            timestamp: Date().addingTimeInterval(-518400) // 6 days ago
+        ),
+        Expense(
+            amount: 150.00,
+            category: "education",
+            description: "Online course subscription",
+            timestamp: Date().addingTimeInterval(-518400)
+        ),
+        Expense(
+            amount: 55.30,
+            category: "groceries",
+            description: "Safeway groceries",
+            timestamp: Date().addingTimeInterval(-604800) // 1 week ago
+        ),
+        Expense(
+            amount: 95.00,
+            category: "entertainment",
+            description: "Concert tickets",
+            timestamp: Date().addingTimeInterval(-604800)
+        ),
+        Expense(
+            amount: 18.50,
+            category: "food",
+            description: "Sushi takeout",
+            timestamp: Date().addingTimeInterval(-691200) // 8 days ago
+        ),
+        Expense(
+            amount: 220.00,
+            category: "fashion",
+            description: "New running shoes",
+            timestamp: Date().addingTimeInterval(-691200)
+        ),
+        Expense(
+            amount: 65.00,
+            category: "health",
+            description: "Gym membership",
+            timestamp: Date().addingTimeInterval(-777600) // 9 days ago
+        ),
+        Expense(
+            amount: 32.99,
+            category: "personal",
+            description: "Haircut",
+            timestamp: Date().addingTimeInterval(-777600)
+        ),
+        Expense(
+            amount: 145.00,
+            category: "utilities",
+            description: "Electric bill",
+            timestamp: Date().addingTimeInterval(-864000) // 10 days ago
+        ),
+        Expense(
+            amount: 24.00,
+            category: "food",
+            description: "Thai food dinner",
+            timestamp: Date().addingTimeInterval(-864000)
+        ),
+        Expense(
+            amount: 75.50,
+            category: "transportation",
+            description: "Car wash and detailing",
+            timestamp: Date().addingTimeInterval(-950400) // 11 days ago
+        ),
+        Expense(
+            amount: 38.99,
+            category: "groceries",
+            description: "Farmers market",
+            timestamp: Date().addingTimeInterval(-950400)
+        ),
+        Expense(
+            amount: 120.00,
+            category: "entertainment",
+            description: "Streaming services bundle",
+            timestamp: Date().addingTimeInterval(-1036800) // 12 days ago
+        ),
+        Expense(
+            amount: 49.99,
+            category: "education",
+            description: "Programming books",
+            timestamp: Date().addingTimeInterval(-1036800)
+        ),
+        Expense(
+            amount: 180.00,
+            category: "health",
+            description: "Dental cleaning",
+            timestamp: Date().addingTimeInterval(-1123200) // 13 days ago
+        ),
+        Expense(
+            amount: 16.75,
+            category: "food",
+            description: "Smoothie and bagel",
+            timestamp: Date().addingTimeInterval(-1123200)
+        ),
+        Expense(
+            amount: 92.00,
+            category: "fashion",
+            description: "H&M shopping",
+            timestamp: Date().addingTimeInterval(-1209600) // 2 weeks ago
+        ),
+        Expense(
+            amount: 58.30,
+            category: "groceries",
+            description: "Costco bulk shopping",
+            timestamp: Date().addingTimeInterval(-1209600)
+        ),
+        Expense(
+            amount: 35.00,
+            category: "transportation",
+            description: "Parking fees",
+            timestamp: Date().addingTimeInterval(-1296000) // 15 days ago
+        ),
+        Expense(
+            amount: 110.00,
+            category: "utilities",
+            description: "Water bill",
+            timestamp: Date().addingTimeInterval(-1296000)
+        ),
+        Expense(
+            amount: 27.50,
+            category: "food",
+            description: "Brunch at cafe",
+            timestamp: Date().addingTimeInterval(-1382400) // 16 days ago
+        ),
+        Expense(
+            amount: 85.00,
+            category: "personal",
+            description: "Spa treatment",
+            timestamp: Date().addingTimeInterval(-1382400)
+        ),
+        Expense(
+            amount: 199.00,
+            category: "other",
+            description: "Home decor items",
+            timestamp: Date().addingTimeInterval(-1468800) // 17 days ago
+        ),
+        Expense(
+            amount: 44.99,
+            category: "entertainment",
+            description: "Video game purchase",
+            timestamp: Date().addingTimeInterval(-1468800)
         )
     ]
     

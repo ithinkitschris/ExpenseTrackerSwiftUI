@@ -44,4 +44,50 @@ extension Expense {
         formatter.dateFormat = "d MMMM"
         return formatter.string(from: timestamp)
     }
+    
+    /// Get the start of the week for this expense
+    var weekStartDate: Date {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: timestamp)
+        return calendar.date(from: components) ?? timestamp
+    }
+    
+    /// Format timestamp as week header
+    var weekHeader: String {
+        let calendar = Calendar.current
+        let weekStart = weekStartDate
+        
+        // Get the week of month (1-based)
+        let weekOfMonth = calendar.component(.weekOfMonth, from: weekStart)
+        
+        // Get the month name
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM"
+        let monthName = formatter.string(from: weekStart)
+        
+        // Create ordinal suffix (1st, 2nd, 3rd, 4th, etc.)
+        let ordinal: String
+        switch weekOfMonth {
+        case 1: ordinal = "1st"
+        case 2: ordinal = "2nd"
+        case 3: ordinal = "3rd"
+        default: ordinal = "\(weekOfMonth)th"
+        }
+        
+        return "\(ordinal) Week of \(monthName)"
+    }
+    
+    /// Get the start of the month for this expense
+    var monthStartDate: Date {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.year, .month], from: timestamp)
+        return calendar.date(from: components) ?? timestamp
+    }
+    
+    /// Format timestamp as month header
+    var monthHeader: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM"
+        return formatter.string(from: timestamp)
+    }
 }

@@ -5,8 +5,10 @@ import UIKit
 struct ExpenseRow: View {
     @Environment(\.theme) var theme
     let expense: Expense
+    var showDate: Bool = false
     var onEdit: (() -> Void)? = nil
     var onDelete: (() -> Void)? = nil
+    var onTap: (() -> Void)? = nil
 
     var body: some View {
 
@@ -16,14 +18,27 @@ struct ExpenseRow: View {
             ZStack(alignment: .bottomTrailing) {
                 VStack(alignment: .leading, spacing: 9) {
                     
-                    // Category icon and name
+                    // Category icon and name OR date
                     HStack(spacing: 6) {
-                        categoryIcon
-                        
-                        Text(Constants.displayNameForCategory(expense.category))
-                            .font(.system(size: 11))
-                            .fontWeight(.medium)
-                            .foregroundColor(.white.opacity(0.8))
+                        if showDate {
+                            // Show date when in category view
+                            Image(systemName: "calendar")
+                                .font(.system(size: 14))
+                                .foregroundColor(.white.opacity(0.8))
+                            
+                            Text(formatDate(expense.timestamp))
+                                .font(.system(size: 11))
+                                .fontWeight(.medium)
+                                .foregroundColor(.white.opacity(0.8))
+                        } else {
+                            // Show category when in all expenses view
+                            categoryIcon
+                            
+                            Text(Constants.displayNameForCategory(expense.category))
+                                .font(.system(size: 11))
+                                .fontWeight(.medium)
+                                .foregroundColor(.white.opacity(0.8))
+                        }
                     }
                     
                     // Expense information (title)
@@ -74,7 +89,16 @@ struct ExpenseRow: View {
                 .padding(.horizontal, 16)
             }
         }
-        
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if let onTap = onTap {
+                if Constants.enableHapticFeedback {
+                    let generator = UIImpactFeedbackGenerator(style: .light)
+                    generator.impactOccurred()
+                }
+                onTap()
+            }
+        }
         .background(
             LinearGradient(
                 gradient: Gradient(colors: [
@@ -86,6 +110,20 @@ struct ExpenseRow: View {
             )
         )
         .cornerRadius(25)
+        .overlay(
+            RoundedRectangle(cornerRadius: 25)
+                .strokeBorder(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            lightenColor(theme.colorForCategory(expense.category), brightnessIncrease: 0.6, saturationDecrease: 0.35),
+                            lightenColor(shiftHueAndDarken(theme.colorForCategory(expense.category), hueShift: 12, brightnessReduction: 0), brightnessIncrease: 0, saturationDecrease: 0)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
         .padding(.horizontal, 2)
     }
 
@@ -105,6 +143,12 @@ struct ExpenseRow: View {
         return formatter.string(from: date)
     }
     
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
+    }
+    
     private func formatIntegerAmount(_ amount: Double) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
@@ -112,6 +156,64 @@ struct ExpenseRow: View {
         formatter.maximumFractionDigits = 0
         formatter.minimumFractionDigits = 0
         return formatter.string(from: NSNumber(value: amount)) ?? "$0"
+    }
+    
+    private func lightenColor(_ color: Color, brightnessIncrease: CGFloat, saturationDecrease: CGFloat) -> Color {
+        let uiColor = UIColor(color)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        // If color can't be converted to HSB (e.g., grayscale), lighten using RGB
+        guard uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha) else {
+            var red: CGFloat = 0
+            var green: CGFloat = 0
+            var blue: CGFloat = 0
+            uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+            // Move RGB values closer to white
+            return Color(
+                red: min(1.0, red + (1.0 - red) * brightnessIncrease),
+                green: min(1.0, green + (1.0 - green) * brightnessIncrease),
+                blue: min(1.0, blue + (1.0 - blue) * brightnessIncrease),
+                opacity: alpha
+            )
+        }
+        
+        // Decrease saturation (move toward white/gray)
+        let lightenedSaturation = max(0, saturation * (1.0 - saturationDecrease))
+        
+        // Increase brightness (move toward white)
+        let lightenedBrightness = min(1.0, brightness + (1.0 - brightness) * brightnessIncrease)
+        
+        return Color(hue: hue, saturation: lightenedSaturation, brightness: lightenedBrightness, opacity: alpha)
+    }
+    
+    private func brightenColor(_ color: Color, brightnessIncrease: CGFloat) -> Color {
+        let uiColor = UIColor(color)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        // If color can't be converted to HSB (e.g., grayscale), brighten using RGB
+        guard uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha) else {
+            var red: CGFloat = 0
+            var green: CGFloat = 0
+            var blue: CGFloat = 0
+            uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+            return Color(
+                red: min(1.0, red * (1.0 + brightnessIncrease)),
+                green: min(1.0, green * (1.0 + brightnessIncrease)),
+                blue: min(1.0, blue * (1.0 + brightnessIncrease)),
+                opacity: alpha
+            )
+        }
+        
+        // Increase brightness by the specified percentage
+        let brightenedBrightness = min(1.0, brightness * (1.0 + brightnessIncrease))
+        
+        return Color(hue: hue, saturation: saturation, brightness: brightenedBrightness, opacity: alpha)
     }
     
     private func shiftHueAndDarken(_ color: Color, hueShift: CGFloat, brightnessReduction: CGFloat) -> Color {

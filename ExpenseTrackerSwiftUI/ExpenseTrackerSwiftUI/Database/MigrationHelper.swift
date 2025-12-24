@@ -64,23 +64,11 @@ final class MigrationHelper {
     /// Export current SwiftData database to SQLite file
     /// - Returns: URL to the exported database file in temporary directory
     func exportToSQLite() throws -> URL {
-        // Get the SwiftData store location
-        let fileManager = FileManager.default
-        
-        // SwiftData stores the database in the app's Application Support directory
-        guard let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            throw MigrationError.exportFailed("Could not locate Application Support directory")
-        }
-        
-        // SwiftData typically stores the database as "default.store"
-        let storeURL = appSupportURL.appendingPathComponent("default.store")
-        
-        // Check if the database file exists
-        guard fileManager.fileExists(atPath: storeURL.path) else {
-            throw MigrationError.exportFailed("Database file not found at \(storeURL.path)")
-        }
+        // Get all expenses from SwiftData
+        let expenses = try DatabaseManager.shared.getExpenses(limit: 10000)
         
         // Create a temporary directory for the export
+        let fileManager = FileManager.default
         let tempDirectory = fileManager.temporaryDirectory
         
         // Create a user-friendly filename with timestamp
@@ -95,10 +83,78 @@ final class MigrationHelper {
             try fileManager.removeItem(at: exportURL)
         }
         
-        // Copy the database file to the temporary location
-        try fileManager.copyItem(at: storeURL, to: exportURL)
+        // Create new SQLite database
+        var db: OpaquePointer?
+        guard sqlite3_open(exportURL.path, &db) == SQLITE_OK else {
+            let errorMsg = String(cString: sqlite3_errmsg(db))
+            sqlite3_close(db)
+            throw MigrationError.exportFailed("Failed to create database: \(errorMsg)")
+        }
+        
+        defer {
+            sqlite3_close(db)
+        }
+        
+        // Create expenses table
+        let createTableSQL = """
+        CREATE TABLE IF NOT EXISTS expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            amount REAL NOT NULL,
+            category TEXT NOT NULL,
+            description TEXT NOT NULL,
+            timestamp TEXT NOT NULL
+        );
+        """
+        
+        var createTableStatement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, createTableSQL, -1, &createTableStatement, nil) == SQLITE_OK else {
+            let errorMsg = String(cString: sqlite3_errmsg(db))
+            throw MigrationError.exportFailed("Failed to create table: \(errorMsg)")
+        }
+        
+        guard sqlite3_step(createTableStatement) == SQLITE_DONE else {
+            let errorMsg = String(cString: sqlite3_errmsg(db))
+            sqlite3_finalize(createTableStatement)
+            throw MigrationError.exportFailed("Failed to execute create table: \(errorMsg)")
+        }
+        
+        sqlite3_finalize(createTableStatement)
+        
+        // Insert all expenses
+        let insertSQL = """
+        INSERT INTO expenses (amount, category, description, timestamp)
+        VALUES (?, ?, ?, ?);
+        """
+        
+        let iso8601Formatter = ISO8601DateFormatter()
+        iso8601Formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        for expense in expenses {
+            var insertStatement: OpaquePointer?
+            guard sqlite3_prepare_v2(db, insertSQL, -1, &insertStatement, nil) == SQLITE_OK else {
+                let errorMsg = String(cString: sqlite3_errmsg(db))
+                throw MigrationError.exportFailed("Failed to prepare insert: \(errorMsg)")
+            }
+            
+            // Bind values
+            sqlite3_bind_double(insertStatement, 1, expense.amount)
+            sqlite3_bind_text(insertStatement, 2, (expense.category as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(insertStatement, 3, (expense.expenseDescription as NSString).utf8String, -1, nil)
+            
+            let timestampString = iso8601Formatter.string(from: expense.timestamp)
+            sqlite3_bind_text(insertStatement, 4, (timestampString as NSString).utf8String, -1, nil)
+            
+            guard sqlite3_step(insertStatement) == SQLITE_DONE else {
+                let errorMsg = String(cString: sqlite3_errmsg(db))
+                sqlite3_finalize(insertStatement)
+                throw MigrationError.exportFailed("Failed to insert expense: \(errorMsg)")
+            }
+            
+            sqlite3_finalize(insertStatement)
+        }
         
         print("✅ Database exported to: \(exportURL.path)")
+        print("📊 Exported \(expenses.count) expenses")
         return exportURL
     }
     
